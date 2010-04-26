@@ -68,7 +68,7 @@ stringprep :: Profile -> Flags -> T.Text -> Either Error T.Text
 stringprep profile flags input = unsafePerformIO io where
 	utf8 = TE.encodeUtf8 input
 	cflags = encodeFlags flags
-	len = B.length utf8
+	len = B.length utf8 + 1 -- + 1 for NUL
 	io = B.useAsCString utf8 (loop len)
 	loop bufsize pIn = F.allocaBytes bufsize $ \buf -> do
 		F.copyArray buf pIn len
