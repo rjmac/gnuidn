@@ -36,6 +36,7 @@ module Data.Text.IDN.StringPrep
 import Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as TE
 import qualified Foreign as F
 import qualified Foreign.C as F
@@ -64,9 +65,9 @@ newtype Profile = Profile (F.Ptr Profile)
 defaultFlags :: Flags
 defaultFlags = Flags True True False
 
-stringprep :: Profile -> Flags -> T.Text -> Either Error T.Text
+stringprep :: Profile -> Flags -> TL.Text -> Either Error TL.Text
 stringprep profile flags input = unsafePerformIO io where
-	utf8 = TE.encodeUtf8 input
+	utf8 = TE.encodeUtf8 $ T.concat $ TL.toChunks input
 	cflags = encodeFlags flags
 	len = B.length utf8 + 1 -- + 1 for NUL
 	io = B.useAsCString utf8 (loop len)
@@ -80,7 +81,7 @@ stringprep profile flags input = unsafePerformIO io where
 			
 			0 -> do
 				bytes <- B.packCString buf
-				return $ Right $ TE.decodeUtf8 bytes
+				return $ Right $ TL.fromChunks [TE.decodeUtf8 bytes]
 			_ -> return $ Left $ cToError rc
 
 encodeFlags :: Flags -> F.CInt
