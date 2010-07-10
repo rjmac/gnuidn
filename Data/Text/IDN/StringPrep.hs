@@ -104,7 +104,7 @@ cToError x = case x of
 	200 -> ErrorNormalisationFailed
 	_ -> ErrorUnknown $ toInteger x
 
-foreign import ccall unsafe "stringprep"
+foreign import ccall "stringprep"
 	c_stringprep :: F.CString -> F.CSize -> F.CInt -> Profile -> IO F.CInt
 
 foreign import ccall "&stringprep_nameprep"
