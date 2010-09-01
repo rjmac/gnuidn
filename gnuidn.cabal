@@ -1,5 +1,5 @@
 name: gnuidn
-version: 0.1.1
+version: 0.1.1.1
 stability: experimental
 synopsis: Bindings for GNU IDN
 license: GPL-3
@@ -20,7 +20,7 @@ library
 
   build-depends:
       base >=3 && < 5
-    , text >= 0.2 && < 0.8
+    , text >= 0.2 && < 0.9
     , bytestring >= 0.9 && < 0.10
 
   extra-libraries: idn
