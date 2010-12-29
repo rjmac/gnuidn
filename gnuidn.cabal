@@ -29,4 +29,5 @@ library
   pkgconfig-depends: libidn
 
   exposed-modules:
+    Data.Text.IDN.Punycode
     Data.Text.IDN.StringPrep
