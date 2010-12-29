@@ -19,28 +19,27 @@ module Data.Text.IDN.StringPrep
 	-- * Stringprep
 	  Flags (..)
 	, Error (..)
+	, Profile
 	, defaultFlags
 	, stringprep
 	
 	-- * Profiles
-	, Profile
-	, profileNameprep
-	, profileSaslPrep
-	, profilePlain
-	, profileTrace
-	, profileKerberos5
-	, profileNodeprep
-	, profileResourceprep
-	, profileISCSI
+	, iscsi
+	, kerberos5
+	, nameprep
+	, sasl
+	, saslAnonymous
+	, trace
+	, xmppNode
+	, xmppResource
 	) where
+
 import Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as TE
 import qualified Foreign as F
 import qualified Foreign.C as F
-import System.IO.Unsafe (unsafePerformIO)
 
 data Error
 	= ErrorContainsUnassigned
@@ -59,30 +58,41 @@ data Flags = Flags
 	, enableBidi :: Bool
 	, allowUnassigned :: Bool
 	}
+	deriving (Show, Eq)
 
 newtype Profile = Profile (F.Ptr Profile)
 
 defaultFlags :: Flags
 defaultFlags = Flags True True False
 
-stringprep :: Profile -> Flags -> TL.Text -> Either Error TL.Text
-stringprep profile flags input = unsafePerformIO io where
-	utf8 = TE.encodeUtf8 $ T.concat $ TL.toChunks input
+stringprep :: Profile -> Flags -> T.Text -> Either Error T.Text
+stringprep profile flags input = F.unsafePerformIO io where
+	io = B.useAsCString utf8 (loop inSize)
+	
+	utf8 = TE.encodeUtf8 input
 	cflags = encodeFlags flags
-	len = B.length utf8 + 1 -- + 1 for NUL
-	io = B.useAsCString utf8 (loop len)
-	loop bufsize pIn = F.allocaBytes bufsize $ \buf -> do
-		F.copyArray buf pIn len
-		let csize = fromIntegral bufsize
-		rc <- c_stringprep buf csize cflags profile
+	inSize = B.length utf8 + 1 -- + 1 for NUL
+	
+	loop outSize inBuf = do
+		res <- tryPrep outSize inBuf
+		case res of
+			Nothing -> loop (outSize + 50) inBuf
+			Just (Right bytes) -> return (Right (TE.decodeUtf8 bytes))
+			Just (Left rc) -> return (Left (cToError rc))
+	
+	tryPrep outSize inBuf = F.allocaBytes outSize $ \outBuf -> do
+		F.copyArray outBuf inBuf inSize
+		let csize = fromIntegral outSize
+		rc <- c_stringprep outBuf csize cflags profile
 		case rc of
 			-- TOO_SMALL_BUFFER
-			100 -> loop (bufsize + 50) pIn
+			100 -> return Nothing
 			
-			0 -> do
-				bytes <- B.packCString buf
-				return $ Right $ TL.fromChunks [TE.decodeUtf8 bytes]
-			_ -> return $ Left $ cToError rc
+			-- success
+			0 -> fmap (Just . Right) (B.packCString outBuf)
+			
+			-- failure
+			_ -> return (Just (Left rc))
 
 encodeFlags :: Flags -> F.CInt
 encodeFlags flags = foldr (.|.) 0 bits where
@@ -102,31 +112,38 @@ cToError x = case x of
 	101 -> ErrorInconsistentProfile
 	102 -> ErrorInvalidFlag
 	200 -> ErrorNormalisationFailed
-	_ -> ErrorUnknown $ toInteger x
+	_ -> ErrorUnknown (toInteger x)
 
 foreign import ccall "stringprep"
 	c_stringprep :: F.CString -> F.CSize -> F.CInt -> Profile -> IO F.CInt
 
+-- | iSCSI (RFC 3722)
+foreign import ccall "&stringprep_iscsi"
+	iscsi :: Profile
+
+-- | Kerberos 5
+foreign import ccall "&stringprep_kerberos5"
+	kerberos5 :: Profile
+
+-- | Nameprep (RFC 3491)
 foreign import ccall "&stringprep_nameprep"
-	profileNameprep :: Profile
+	nameprep :: Profile
 
+-- | SASLprep (RFC 4013)
 foreign import ccall "&stringprep_saslprep"
-	profileSaslPrep :: Profile
+	sasl :: Profile
 
+-- | Draft SASL ANONYMOUS
 foreign import ccall "&stringprep_plain"
-	profilePlain :: Profile
+	saslAnonymous :: Profile
 
 foreign import ccall "&stringprep_trace"
-	profileTrace :: Profile
+	trace :: Profile
 
-foreign import ccall "&stringprep_kerberos5"
-	profileKerberos5 :: Profile
-
+-- | XMPP node (RFC 3920)
 foreign import ccall "&stringprep_xmpp_nodeprep"
-	profileNodeprep :: Profile
+	xmppNode :: Profile
 
+-- | XMPP resource (RFC 3920)
 foreign import ccall "&stringprep_xmpp_resourceprep"
-	profileResourceprep :: Profile
-
-foreign import ccall "&stringprep_iscsi"
-	profileISCSI :: Profile
+	xmppResource :: Profile
