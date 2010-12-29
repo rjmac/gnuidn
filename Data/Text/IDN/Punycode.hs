@@ -16,10 +16,12 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 module Data.Text.IDN.Punycode
 	( encode
+	, decode
 	) where
 
 import Control.Exception (ErrorCall(..), throwIO)
-import Data.Char (ord)
+import Control.Monad (unless)
+import Data.Char (chr, ord)
 import Data.List (unfoldr)
 import qualified Data.ByteString as B
 import qualified Data.Text as T
@@ -75,6 +77,46 @@ encode input maybeIsCase = F.unsafePerformIO io where
 	peekOut outBuf outSize = B.packCStringLen cstr where
 		cstr = (outBuf, fromIntegral outSize)
 
+-- | Decode
+decode :: B.ByteString -- * Input
+       -> Maybe (T.Text, (Integer -> Bool))
+decode input = F.unsafePerformIO $
+	let outMax = B.length input in
+	B.useAsCStringLen input $ \(inBuf, inSize) ->
+	F.alloca $ \outSizeBuf ->
+	F.allocaArray outMax $ \outBuf -> do
+	
+	flagForeign <- F.mallocForeignPtrArray outMax
+	F.poke outSizeBuf (fromIntegral outMax)
+	
+	rc <- F.withForeignPtr flagForeign $ \flagBuf -> c_decode
+		(fromIntegral inSize)
+		inBuf
+		outSizeBuf
+		outBuf
+		flagBuf
+	
+	if rc == 1
+		then return Nothing
+		else do
+			unless (rc == 0) (cToError rc)
+			
+			outSize <- F.peek outSizeBuf
+			codepoints <- F.peekArray (fromIntegral outSize) outBuf
+			
+			let text = T.pack (map (chr . fromIntegral) codepoints)
+			return (Just (text, checkCaseFlag flagForeign outSize))
+
+checkCaseFlag :: F.ForeignPtr (F.CUChar) -> F.CSize -> Integer -> Bool
+checkCaseFlag ptr csize = checkIdx where
+	intsize = toInteger csize
+	checkIdx idx | idx >= intsize = False
+	checkIdx idx =
+		F.unsafePerformIO $
+		F.withForeignPtr ptr $ \buf -> do
+			cuchar <- F.peekElemOff buf (fromInteger idx)
+			return (F.toBool cuchar)
+
 cToError :: F.CInt -> IO a
 cToError rc = do
 	str <- F.peekCString =<< c_strerror rc
@@ -86,6 +128,14 @@ foreign import ccall "punycode_encode"
 	         -> F.Ptr F.CUChar
 	         -> F.Ptr F.CSize
 	         -> F.Ptr F.CChar
+	         -> IO F.CInt
+
+foreign import ccall "punycode_decode"
+	c_decode :: F.CSize
+	         -> F.Ptr F.CChar
+	         -> F.Ptr F.CSize
+	         -> F.Ptr F.Word32
+	         -> F.Ptr F.CUChar
 	         -> IO F.CInt
 
 foreign import ccall "punycode_strerror"
