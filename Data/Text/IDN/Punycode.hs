@@ -110,6 +110,7 @@ decode input = F.unsafePerformIO $
 checkCaseFlag :: F.ForeignPtr (F.CUChar) -> F.CSize -> Integer -> Bool
 checkCaseFlag ptr csize = checkIdx where
 	intsize = toInteger csize
+	checkIdx idx | idx < 0        = False
 	checkIdx idx | idx >= intsize = False
 	checkIdx idx =
 		F.unsafePerformIO $
