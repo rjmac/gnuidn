@@ -18,7 +18,7 @@ module Data.Text.IDN.StringPrep
 	(
 	-- * Stringprep
 	  Flags (..)
-	, Error (..)
+	, Error
 	, Profile
 	, defaultFlags
 	, stringprep
@@ -41,16 +41,7 @@ import qualified Data.Text.Encoding as TE
 import qualified Foreign as F
 import qualified Foreign.C as F
 
-data Error
-	= ErrorContainsUnassigned
-	| ErrorContainsProhibited
-	| ErrorBidiBothLAndRAL
-	| ErrorBidiLeadTrailNotRAL
-	| ErrorBidiContainsProhibited
-	| ErrorInconsistentProfile
-	| ErrorInvalidFlag
-	| ErrorNormalisationFailed
-	| ErrorUnknown Integer
+data Error = StringPrepError T.Text
 	deriving (Show, Eq)
 
 data Flags = Flags
@@ -103,19 +94,14 @@ encodeFlags flags = foldr (.|.) 0 bits where
 	       ]
 
 cToError :: F.CInt -> Error
-cToError x = case x of
-	1 -> ErrorContainsUnassigned
-	2 -> ErrorContainsProhibited
-	3 -> ErrorBidiBothLAndRAL
-	4 -> ErrorBidiLeadTrailNotRAL
-	5 -> ErrorBidiContainsProhibited
-	101 -> ErrorInconsistentProfile
-	102 -> ErrorInvalidFlag
-	200 -> ErrorNormalisationFailed
-	_ -> ErrorUnknown (toInteger x)
+cToError rc = StringPrepError (T.pack str) where
+	str = F.unsafePerformIO (c_strerror rc >>= F.peekCString)
 
 foreign import ccall "stringprep"
 	c_stringprep :: F.CString -> F.CSize -> F.CInt -> Profile -> IO F.CInt
+
+foreign import ccall "stringprep_strerror"
+	c_strerror :: F.CInt -> IO F.CString
 
 -- | iSCSI (RFC 3722)
 foreign import ccall "&stringprep_iscsi"
