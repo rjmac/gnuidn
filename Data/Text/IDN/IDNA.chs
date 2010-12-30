@@ -22,8 +22,6 @@ module Data.Text.IDN.IDNA
 	, toUnicode
 	) where
 
-import Control.Exception (ErrorCall(..), throwIO)
-import Control.Monad (unless)
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 
@@ -51,7 +49,7 @@ data Flags = Flags
 defaultFlags :: Flags
 defaultFlags = Flags False False
 
-toASCII :: Flags -> T.Text -> B.ByteString
+toASCII :: Flags -> T.Text -> Either Error B.ByteString
 toASCII flags input =
 	unsafePerformIO $
 	withArray0 0 (toUCS4 input) $ \buf ->
@@ -61,14 +59,15 @@ toASCII flags input =
 			(castPtr buf) outBufPtr c_flags
 		
 		let rc = fromIntegral c_rc
-		unless (rc == fromEnum SUCCESS) (cToError c_rc)
-		
-		outBuf <- peek outBufPtr
-		bytes <- B.packCString outBuf
-		{# call idn_free #} (castPtr outBuf)
-		return bytes
+		if rc /= fromEnum SUCCESS
+			then return (Left (cToError c_rc))
+			else do
+				outBuf <- peek outBufPtr
+				bytes <- B.packCString outBuf
+				{# call idn_free #} (castPtr outBuf)
+				return (Right bytes)
 
-toUnicode :: Flags -> B.ByteString -> T.Text
+toUnicode :: Flags -> B.ByteString -> Either Error T.Text
 toUnicode flags input =
 	unsafePerformIO $
 	B.useAsCString input $ \buf ->
@@ -78,12 +77,13 @@ toUnicode flags input =
 			(castPtr buf) outBufPtr c_flags
 		
 		let rc = fromIntegral c_rc
-		unless (rc == fromEnum SUCCESS) (cToError c_rc)
-		
-		outBuf <- peek outBufPtr
-		ucs4 <- peekArray0 0 (castPtr outBuf)
-		{# call idn_free #} (castPtr outBuf)
-		return (fromUCS4 ucs4)
+		if rc /= fromEnum SUCCESS
+			then return (Left (cToError c_rc))
+			else do
+				outBuf <- peek outBufPtr
+				ucs4 <- peekArray0 0 (castPtr outBuf)
+				{# call idn_free #} (castPtr outBuf)
+				return (Right (fromUCS4 ucs4))
 
 encodeFlags :: Flags -> CInt
 encodeFlags flags = foldr (.|.) 0 bits where
@@ -92,7 +92,7 @@ encodeFlags flags = foldr (.|.) 0 bits where
 	       , bitAt allowUnassigned ALLOW_UNASSIGNED
 	       ]
 
-cToError :: CInt -> IO a
-cToError rc = do
-	str <- peekCString =<< {# call idna_strerror #} rc
-	throwIO (ErrorCall str)
+cToError :: CInt -> Error
+cToError rc = IDNAError (T.pack str) where
+	c_strerror = {# call idna_strerror #}
+	str = unsafePerformIO (c_strerror rc >>= peekCString)
