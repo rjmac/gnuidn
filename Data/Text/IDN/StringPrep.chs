@@ -41,6 +41,8 @@ import qualified Data.Text.Encoding as TE
 import Foreign
 import Foreign.C
 
+import Data.Text.IDN.Internal
+
 #include <stringprep.h>
 
 {# pointer *Stringprep_profile as Profile newtype #}
@@ -48,9 +50,6 @@ import Foreign.C
 {# enum Stringprep_rc {} with prefix = "STRINGPREP_" #}
 
 {# enum Stringprep_profile_flags {} with prefix = "STRINGPREP_" #}
-
-data Error = StringPrepError T.Text
-	deriving (Show, Eq)
 
 data Flags = Flags
 	{ enableNFKC :: Bool

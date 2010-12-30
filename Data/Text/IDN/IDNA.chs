@@ -28,7 +28,7 @@ import qualified Data.Text as T
 import Foreign
 import Foreign.C
 
-import Data.Text.IDN.Internal (toUCS4, fromUCS4)
+import Data.Text.IDN.Internal
 
 #include <idna.h>
 #include <idn-free.h>
@@ -36,9 +36,6 @@ import Data.Text.IDN.Internal (toUCS4, fromUCS4)
 {# enum Idna_rc {} with prefix = "IDNA_" #}
 
 {# enum Idna_flags {} with prefix = "IDNA_" #}
-
-data Error = IDNAError T.Text
-	deriving (Show, Eq)
 
 data Flags = Flags
 	{ useStd3Rules :: Bool

@@ -14,7 +14,8 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 module Data.Text.IDN.Internal
-	( toUCS4
+	( Error (..)
+	, toUCS4
 	, fromUCS4
 	) where
 
@@ -22,6 +23,10 @@ import qualified Data.Text as T
 import Data.Char (chr, ord)
 
 import qualified Foreign as F
+
+data Error = IDNAError T.Text
+           | StringPrepError T.Text
+	deriving (Show, Eq)
 
 toUCS4 :: T.Text -> [F.Word32]
 toUCS4 = map (fromIntegral . ord) . T.unpack
