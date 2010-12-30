@@ -32,5 +32,7 @@ library
     c2hs
 
   exposed-modules:
+    Data.Text.IDN.IDNA
+    Data.Text.IDN.Internal
     Data.Text.IDN.Punycode
     Data.Text.IDN.StringPrep

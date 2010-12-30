@@ -21,7 +21,6 @@ module Data.Text.IDN.Punycode
 
 import Control.Exception (ErrorCall(..), throwIO)
 import Control.Monad (unless)
-import Data.Char (chr, ord)
 import Data.List (unfoldr)
 import qualified Data.ByteString as B
 import qualified Data.Text as T
@@ -29,13 +28,13 @@ import qualified Data.Text as T
 import Foreign
 import Foreign.C
 
+import Data.Text.IDN.Internal (toUCS4, fromUCS4)
+
 #include <punycode.h>
 
 {# enum Punycode_status {} with prefix = "PUNYCODE_" #}
 
 type SizeT = {# type size_t #}
-
-type PunycodeUInt = {# type punycode_uint #}
 
 -- | Encode
 encode :: T.Text -- * Input
@@ -50,10 +49,7 @@ encode input maybeIsCase = unsafePerformIO io where
 	
 	io = maybeWith (withArray . take inSize) flags impl
 	
-	codepoints :: [PunycodeUInt]
-	codepoints = map (fromIntegral . ord) (T.unpack input)
-	
-	impl caseBuf = withArray codepoints (loop caseBuf inSize)
+	impl caseBuf = withArray (toUCS4 input) (loop caseBuf inSize . castPtr)
 	
 	loop caseBuf outMax inBuf = do
 		res <- tryEnc caseBuf outMax inBuf
@@ -113,9 +109,8 @@ decode input = unsafePerformIO $
 			unless (rc == fromEnum SUCCESS) (cToError c_rc)
 			
 			outSize <- peek outSizeBuf
-			codepoints <- peekArray (fromIntegral outSize) outBuf
-			
-			let text = T.pack (map (chr . fromIntegral) codepoints)
+			ucs4 <- peekArray (fromIntegral outSize) (castPtr outBuf)
+			let text = fromUCS4 ucs4
 			return (Just (text, checkCaseFlag flagForeign outSize))
 
 checkCaseFlag :: ForeignPtr CUChar -> SizeT -> Integer -> Bool
@@ -131,8 +126,5 @@ checkCaseFlag ptr csize = checkIdx where
 
 cToError :: CInt -> IO a
 cToError rc = do
-	str <- peekCString =<< c_strerror rc
+	str <- peekCString =<< {# call punycode_strerror #} rc
 	throwIO (ErrorCall str)
-
-foreign import ccall "punycode_strerror"
-	c_strerror :: CInt -> IO CString
