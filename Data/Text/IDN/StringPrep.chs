@@ -34,12 +34,20 @@ module Data.Text.IDN.StringPrep
 	, xmppResource
 	) where
 
-import Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import qualified Foreign as F
-import qualified Foreign.C as F
+
+import Foreign
+import Foreign.C
+
+#include <stringprep.h>
+
+{# pointer *Stringprep_profile as Profile newtype #}
+
+{# enum Stringprep_rc {} with prefix = "STRINGPREP_" #}
+
+{# enum Stringprep_profile_flags {} with prefix = "STRINGPREP_" #}
 
 data Error = StringPrepError T.Text
 	deriving (Show, Eq)
@@ -51,17 +59,15 @@ data Flags = Flags
 	}
 	deriving (Show, Eq)
 
-newtype Profile = Profile (F.Ptr Profile)
-
 defaultFlags :: Flags
 defaultFlags = Flags True True False
 
 stringprep :: Profile -> Flags -> T.Text -> Either Error T.Text
-stringprep profile flags input = F.unsafePerformIO io where
+stringprep profile flags input = unsafePerformIO io where
 	io = B.useAsCString utf8 (loop inSize)
 	
 	utf8 = TE.encodeUtf8 input
-	cflags = encodeFlags flags
+	c_flags = encodeFlags flags
 	inSize = B.length utf8 + 1 -- + 1 for NUL
 	
 	loop outSize inBuf = do
@@ -71,37 +77,31 @@ stringprep profile flags input = F.unsafePerformIO io where
 			Just (Right bytes) -> return (Right (TE.decodeUtf8 bytes))
 			Just (Left rc) -> return (Left (cToError rc))
 	
-	tryPrep outSize inBuf = F.allocaBytes outSize $ \outBuf -> do
-		F.copyArray outBuf inBuf inSize
+	tryPrep outSize inBuf = allocaBytes outSize $ \outBuf -> do
+		copyArray outBuf inBuf inSize
 		let csize = fromIntegral outSize
-		rc <- c_stringprep outBuf csize cflags profile
-		case rc of
-			-- TOO_SMALL_BUFFER
-			100 -> return Nothing
-			
-			-- success
-			0 -> fmap (Just . Right) (B.packCString outBuf)
-			
-			-- failure
-			_ -> return (Just (Left rc))
+		c_rc <- {# call stringprep as c_stringprep #}
+			outBuf csize c_flags profile
+		
+		let rc = fromIntegral c_rc
+		if rc == fromEnum TOO_SMALL_BUFFER
+			then return Nothing
+			else if rc == fromEnum OK
+				then fmap (Just . Right) (B.packCString outBuf)
+				else return (Just (Left c_rc))
 
-encodeFlags :: Flags -> F.CInt
+encodeFlags :: Flags -> CInt
 encodeFlags flags = foldr (.|.) 0 bits where
-	bit f x y = if f flags then x else y
-	bits = [ bit enableNFKC 0 1
-	       , bit enableBidi 0 2
-	       , bit allowUnassigned 0 4
+	bitAt f e = if f flags then 0 else fromIntegral (fromEnum e)
+	bits = [ bitAt enableNFKC NO_NFKC
+	       , bitAt enableBidi NO_BIDI
+	       , bitAt allowUnassigned NO_UNASSIGNED
 	       ]
 
-cToError :: F.CInt -> Error
+cToError :: CInt -> Error
 cToError rc = StringPrepError (T.pack str) where
-	str = F.unsafePerformIO (c_strerror rc >>= F.peekCString)
-
-foreign import ccall "stringprep"
-	c_stringprep :: F.CString -> F.CSize -> F.CInt -> Profile -> IO F.CInt
-
-foreign import ccall "stringprep_strerror"
-	c_strerror :: F.CInt -> IO F.CString
+	c_strerror = {# call stringprep_strerror #}
+	str = unsafePerformIO (c_strerror rc >>= peekCString)
 
 -- | iSCSI (RFC 3722)
 foreign import ccall "&stringprep_iscsi"

@@ -28,6 +28,9 @@ library
   extra-libraries: idn
   pkgconfig-depends: libidn
 
+  build-tools:
+    c2hs
+
   exposed-modules:
     Data.Text.IDN.Punycode
     Data.Text.IDN.StringPrep
