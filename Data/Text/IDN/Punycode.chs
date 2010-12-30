@@ -1,3 +1,5 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
+
 -- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
@@ -13,7 +15,12 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE ForeignFunctionInterface #-}
+-- | Punycode is a simple and efficient transfer encoding syntax designed
+-- for use with Internationalized Domain Names in Applications (IDNA). It
+-- uniquely and reversibly transforms a Unicode string into ASCII. ASCII
+-- characters in the Unicode string are represented literally, and non-ASCII
+-- characters are represented by ASCII characters that are allowed in host
+-- name labels (letters, digits, and hyphens).
 module Data.Text.IDN.Punycode
 	( encode
 	, decode
@@ -36,7 +43,9 @@ import Data.Text.IDN.Internal (toUCS4, fromUCS4)
 
 type SizeT = {# type size_t #}
 
--- | Encode
+-- | Encode unicode into an ASCII-only 'B.ByteString'. If provided, the
+-- case predicate indicates whether to uppercase the corresponding character
+-- after decoding.
 encode :: T.Text -- * Input
        -> Maybe (Integer -> Bool) -- * Case flag predicate
        -> B.ByteString
@@ -82,7 +91,11 @@ encode input maybeIsCase = unsafePerformIO io where
 	peekOut outBuf outSize = B.packCStringLen cstr where
 		cstr = (outBuf, fromIntegral outSize)
 
--- | Decode
+-- | Decode a 'B.ByteString' into unicode. The second component of the
+-- result is a case predicate; it indicates whether a particular character
+-- position of the result string should be upper-cased.
+--
+-- Returns 'Nothing' if the input is invalid.
 decode :: B.ByteString -- * Input
        -> Maybe (T.Text, (Integer -> Bool))
 decode input = unsafePerformIO $
