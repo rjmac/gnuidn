@@ -33,6 +33,8 @@ library
 
   exposed-modules:
     Data.Text.IDN.IDNA
-    Data.Text.IDN.Internal
     Data.Text.IDN.Punycode
     Data.Text.IDN.StringPrep
+
+  other-modules:
+    Data.Text.IDN.Internal
