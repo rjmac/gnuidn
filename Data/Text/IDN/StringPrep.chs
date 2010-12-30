@@ -20,11 +20,11 @@ module Data.Text.IDN.StringPrep
 	-- * Stringprep
 	  Flags (..)
 	, Error
-	, Profile
 	, defaultFlags
 	, stringprep
 	
 	-- * Profiles
+	, Profile
 	, iscsi
 	, kerberos5
 	, nameprep
@@ -54,11 +54,23 @@ import Data.Text.IDN.Internal
 
 data Flags = Flags
 	{ enableNFKC :: Bool
+	-- ^ Enable the NFKC normalization, as well as selecting the NFKC
+	-- case folding tables. Usually the profile specifies BIDI and NFKC
+	-- settings, and applications should not override it unless in
+	-- special situations.
+	
 	, enableBidi :: Bool
+	-- ^ Enable the BIDI step. Usually the profile specifies BIDI and
+	-- NFKC settings, and applications should not override it unless in
+	-- special situations.
+	
 	, allowUnassigned :: Bool
+	-- ^ If false, 'stringprep' will return an error if the input
+	-- contains characters not assigned to the profile.
 	}
 	deriving (Show, Eq)
 
+-- | @defaultFlags = Flags True True False@
 defaultFlags :: Flags
 defaultFlags = Flags True True False
 

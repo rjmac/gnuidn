@@ -39,15 +39,11 @@ import Data.Text.IDN.Internal (toUCS4, fromUCS4)
 
 #include <punycode.h>
 
-{# enum Punycode_status {} with prefix = "PUNYCODE_" #}
-
-type SizeT = {# type size_t #}
-
 -- | Encode unicode into an ASCII-only 'B.ByteString'. If provided, the
 -- case predicate indicates whether to uppercase the corresponding character
 -- after decoding.
-encode :: T.Text -- * Input
-       -> Maybe (Integer -> Bool) -- * Case flag predicate
+encode :: T.Text
+       -> Maybe (Integer -> Bool)
        -> B.ByteString
 encode input maybeIsCase = unsafePerformIO io where
 	inSize = T.length input
@@ -96,7 +92,7 @@ encode input maybeIsCase = unsafePerformIO io where
 -- position of the result string should be upper-cased.
 --
 -- Returns 'Nothing' if the input is invalid.
-decode :: B.ByteString -- * Input
+decode :: B.ByteString
        -> Maybe (T.Text, (Integer -> Bool))
 decode input = unsafePerformIO $
 	let outMax = B.length input in
@@ -125,6 +121,10 @@ decode input = unsafePerformIO $
 			ucs4 <- peekArray (fromIntegral outSize) (castPtr outBuf)
 			let text = fromUCS4 ucs4
 			return (Just (text, checkCaseFlag flagForeign outSize))
+
+type SizeT = {# type size_t #}
+
+{# enum Punycode_status {} with prefix = "PUNYCODE_" #}
 
 checkCaseFlag :: ForeignPtr CUChar -> SizeT -> Integer -> Bool
 checkCaseFlag ptr csize = checkIdx where
