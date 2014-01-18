@@ -1,5 +1,5 @@
 name: gnuidn
-version: 0.2
+version: 0.2.1
 license: GPL-3
 license-file: license.txt
 author: John Millikin
@@ -20,7 +20,7 @@ source-repository head
 source-repository this
   type: git
   location: https://john-millikin.com/code/haskell-gnuidn/
-  tag: gnuidn_0.2
+  tag: haskell-gnuidn_0.2.1
 
 library
   ghc-options: -Wall -O2
