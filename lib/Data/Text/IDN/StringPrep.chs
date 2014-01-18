@@ -38,6 +38,7 @@ module Data.Text.IDN.StringPrep
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import qualified System.IO.Unsafe as Unsafe
 
 import Foreign
 import Foreign.C
@@ -75,7 +76,7 @@ defaultFlags :: Flags
 defaultFlags = Flags True True False
 
 stringprep :: Profile -> Flags -> T.Text -> Either Error T.Text
-stringprep profile flags input = unsafePerformIO io where
+stringprep profile flags input = Unsafe.unsafePerformIO io where
 	io = B.useAsCString utf8 (loop inSize)
 	
 	utf8 = TE.encodeUtf8 input
@@ -113,7 +114,7 @@ encodeFlags flags = foldr (.|.) 0 bits where
 cToError :: CInt -> Error
 cToError rc = StringPrepError (T.pack str) where
 	c_strerror = {# call stringprep_strerror #}
-	str = unsafePerformIO (c_strerror rc >>= peekCString)
+	str = Unsafe.unsafePerformIO (c_strerror rc >>= peekCString)
 
 -- | iSCSI (RFC 3722)
 foreign import ccall "&stringprep_iscsi"

@@ -26,6 +26,7 @@ module Data.Text.IDN.IDNA
 import Control.Exception (ErrorCall(..), throwIO)
 import qualified Data.ByteString as B
 import qualified Data.Text as T
+import qualified System.IO.Unsafe as Unsafe
 
 import Foreign
 import Foreign.C
@@ -60,7 +61,7 @@ defaultFlags = Flags True False
 -- multiple times gives the same result as applying it once.
 toASCII :: Flags -> T.Text -> Either Error B.ByteString
 toASCII flags input =
-	unsafePerformIO $
+	Unsafe.unsafePerformIO $
 	withArray0 0 (toUCS4 input) $ \buf ->
 	let c_flags = encodeFlags flags in
 	alloca $ \outBufPtr -> do
@@ -83,7 +84,7 @@ toASCII flags input =
 -- If the input cannot be decoded, it is returned unchanged.
 toUnicode :: Flags -> B.ByteString -> T.Text
 toUnicode flags input =
-	unsafePerformIO $
+	Unsafe.unsafePerformIO $
 	B.useAsCString input $ \buf ->
 	let c_flags = encodeFlags flags in
 	alloca $ \outBufPtr -> do
@@ -109,7 +110,7 @@ encodeFlags flags = foldr (.|.) 0 bits where
 cToError :: CInt -> Error
 cToError rc = IDNAError (T.pack str) where
 	c_strerror = {# call idna_strerror #}
-	str = unsafePerformIO (c_strerror rc >>= peekCString)
+	str = Unsafe.unsafePerformIO (c_strerror rc >>= peekCString)
 
 throwError :: CInt -> IO a
 throwError rc = do

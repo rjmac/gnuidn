@@ -31,6 +31,7 @@ import Control.Monad (unless)
 import Data.List (unfoldr)
 import qualified Data.ByteString as B
 import qualified Data.Text as T
+import qualified System.IO.Unsafe as Unsafe
 
 import Foreign
 import Foreign.C
@@ -45,7 +46,7 @@ import Data.Text.IDN.Internal (toUCS4, fromUCS4)
 encode :: T.Text
        -> Maybe (Integer -> Bool)
        -> B.ByteString
-encode input maybeIsCase = unsafePerformIO io where
+encode input maybeIsCase = Unsafe.unsafePerformIO io where
 	inSize = T.length input
 	
 	flags = flip fmap maybeIsCase $ \isCase -> let
@@ -94,7 +95,7 @@ encode input maybeIsCase = unsafePerformIO io where
 -- Returns 'Nothing' if the input is invalid.
 decode :: B.ByteString
        -> Maybe (T.Text, (Integer -> Bool))
-decode input = unsafePerformIO $
+decode input = Unsafe.unsafePerformIO $
 	let outMax = B.length input in
 	B.useAsCStringLen input $ \(inBuf, inSize) ->
 	alloca $ \outSizeBuf ->
@@ -132,7 +133,7 @@ checkCaseFlag ptr csize = checkIdx where
 	checkIdx idx | idx < 0        = False
 	checkIdx idx | idx >= intsize = False
 	checkIdx idx =
-		unsafePerformIO $
+		Unsafe.unsafePerformIO $
 		withForeignPtr ptr $ \buf -> do
 			cuchar <- peekElemOff buf (fromInteger idx)
 			return (toBool cuchar)
