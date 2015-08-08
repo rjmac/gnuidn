@@ -102,7 +102,7 @@ toUnicode flags input =
 
 encodeFlags :: Flags -> CInt
 encodeFlags flags = foldr (.|.) 0 bits where
-	bitAt f e = if f flags then 0 else fromIntegral (fromEnum e)
+	bitAt f e = if f flags then fromIntegral (fromEnum e) else 0
 	bits = [ bitAt verifySTD3 USE_STD3_ASCII_RULES
 	       , bitAt allowUnassigned ALLOW_UNASSIGNED
 	       ]
